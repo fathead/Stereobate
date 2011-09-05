@@ -2,17 +2,28 @@ const express = require('express')
   , _ = require('underscore')
   , RETSSystem = require('../Model-RETS-System')
   , systems = {}
-  , search = require('./lib/search');
+  , search = require('./lib/search')
+  , photo = require('./lib/photo');
 
 _.mixin(require('underscore.string'));
 
 var app = express.createServer();
 
 app.configure(function() {
-    app.use(express.bodyParser());
-    app.use(express.responseTime());
-    app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
-    app.use(app.router);
+  app.use(express.bodyParser());
+  app.use(express.responseTime());
+  app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
+  app.use(app.router);
+  app.use(function(err, req, res, next){
+    // if there's an error, always just show a basic 404
+    if(err){
+      console.log(err);
+      res.send('resource not found', 404);
+    }else{
+      next();
+    }
+  });
+  app.use(express.static(__dirname + '/photos'));
 });
 
 app.get('/', function(req, res) {
@@ -50,6 +61,25 @@ function system(req, res, next) {
   }
 }
 
+function load_metadata(SystemID, cb) {
+  var system = systems[SystemID];
+
+  if(system) {
+    cb(null, system);
+    return;
+  }  
+
+  RETSSystem({ SystemID: SystemID }, function(err, result) {
+    if (err) {
+      cb(err);
+      return;
+    }
+
+    system = systems[SystemID] = result;
+    cb(null, system);
+  });
+}
+
 app.get('/:systemid/GetMetadata', function(req, res) {
   console.log('/metadata');
 
@@ -72,30 +102,8 @@ app.get('/:systemid/Search', normalize, auth, system, search, function(req, res)
   res.send(req.data, { 'Content-Type': 'text/plain' });
 });
 
-// this is the catchall route and should be last
-app.get('/*', function(req, res) {
-    console.log(req);
-    //res.render('404', { status: 404, layout: false });
-    res.send(404);
+app.get('/:systemid/GetObject', normalize, auth, photo, function(req, res, next){
+  next();
 });
 
 app.listen(8888);
-
-function load_metadata(SystemID, cb) {
-  var system = systems[SystemID];
-
-  if(system) {
-    cb(null, system);
-    return;
-  }  
-
-  RETSSystem({ SystemID: SystemID }, function(err, result) {
-    if (err) {
-      cb(err);
-      return;
-    }
-
-    system = systems[SystemID] = result;
-    cb(null, system);
-  });
-}

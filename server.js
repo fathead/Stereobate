@@ -3,11 +3,15 @@ const express = require('express')
   , RETSSystem = require('../Model-RETS-System')
   , systems = {}
   , search = require('./lib/search')
-  , photo = require('./lib/photo');
+  , photo = require('./lib/photo')
+  , fs = require('fs')
 
 _.mixin(require('underscore.string'));
 
 var app = express.createServer();
+
+app.register('.xml', require('ejs'));
+app.set('view engine', 'xml');
 
 app.configure(function() {
   app.use(express.bodyParser());
@@ -63,7 +67,6 @@ function system(req, res, next) {
 
 function load_metadata(SystemID, cb) {
   var system = systems[SystemID];
-
   if(system) {
     cb(null, system);
     return;
@@ -106,4 +109,37 @@ app.get('/:systemid/GetObject', normalize, auth, photo, function(req, res, next)
   next();
 });
 
-app.listen(8888);
+app.dynamicHelpers({
+  script: function(req) {
+    return function(path) {
+      return fs.readFileSync('./views/js/' + path, 'utf8');
+    };
+  },
+  lib: function(req) {
+    return function(path) {
+      return fs.readFileSync('../lib/' + path, 'utf8');
+    };
+  },
+  css: function(req) {
+    return function(path) {
+      return fs.readFileSync('./views/css/' + path, 'utf8');
+    };
+  },
+  ich: function(req) {
+    return function(path) {
+      return fs.readFileSync('./templates/' + req.param('systemid') + '/' + path, 'utf8');
+    };
+  },
+  js: function(req) {
+    return function(path) {
+      return fs.readFileSync('./templates/' + req.param('systemid') + '/' + path, 'utf8');
+    };
+  }
+});
+
+app.get('/:systemid/GadgetSpec', function(req, res, next) {
+  res.render('spec', { layout: false, locals: { SystemID: req.param('systemid') } });
+});
+
+app.listen(3000);
+console.log('Data service started on port 3000');

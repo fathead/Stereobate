@@ -10,8 +10,9 @@ _.mixin(require('underscore.string'));
 
 var app = express.createServer();
 
-app.register('.xml', require('ejs'));
-app.set('view engine', 'xml');
+app.register('.html', require('ejs'));
+app.set('view engine', 'html');
+app.set("jsonp callback", true);
 
 app.configure(function() {
   app.use(express.bodyParser());
@@ -27,7 +28,7 @@ app.configure(function() {
       next();
     }
   });
-  app.use(express.static(__dirname + '/photos'));
+  app.use(express.static(__dirname + '/static'));
 });
 
 app.get('/', function(req, res) {
@@ -96,7 +97,7 @@ app.get('/:systemid/GetMetadata', function(req, res) {
       return;
     }
 
-    res.contentType('json');
+    res.contentType('jsonp');
     res.send(system.metadata);
   });
 });
@@ -117,7 +118,7 @@ app.dynamicHelpers({
   },
   lib: function(req) {
     return function(path) {
-      return fs.readFileSync('../lib/' + path, 'utf8');
+      return fs.readFileSync('./static/lib/' + path, 'utf8');
     };
   },
   css: function(req) {
@@ -127,18 +128,26 @@ app.dynamicHelpers({
   },
   ich: function(req) {
     return function(path) {
-      return fs.readFileSync('./templates/' + req.param('systemid') + '/' + path, 'utf8');
+      return fs.readFileSync('./static/templates/' + req.param('systemid') + '/' + path, 'utf8');
     };
   },
   js: function(req) {
     return function(path) {
-      return fs.readFileSync('./templates/' + req.param('systemid') + '/' + path, 'utf8');
+      return fs.readFileSync('./static/templates/' + req.param('systemid') + '/' + path, 'utf8');
     };
   }
 });
 
 app.get('/:systemid/GadgetSpec', function(req, res, next) {
-  res.render('spec', { layout: false, locals: { SystemID: req.param('systemid') } });
+  res.render('app', { layout: 'layouts/gadget.html', locals: { SystemID: req.param('systemid') } });
+});
+
+app.get('/:systemid/App', function(req, res, next) {
+  res.render('app', { layout: false, locals: { 
+    SystemID: req.param('systemid'),
+    service_base_url: req.param('service_base_url'),
+    branding: req.param('branding')
+  } });
 });
 
 app.listen(3000);
